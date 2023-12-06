@@ -1,24 +1,178 @@
-# README
+## first commit
+[Dockerを用いてRuby on Railsの環境構築をする方法( Docker初学者向け )→必要なファイルを用意](https://qiita.com/Yusuke_Hoirta/items/3a50d066af3bafbb8641#%E5%BF%85%E8%A6%81%E3%81%AA%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%82%92%E7%94%A8%E6%84%8F)まで
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+## `docker-compose run web rails new . --force --database=mysql --skip-bundle`実行
+- `docker-compose run web rails new . --force --database=mysql --skip-bundle`：成功！
+- `docker-compose build --no-cache`：エラー
+```sh
+myapp % docker-compose build --no-cache
+ => ERROR [web build 3/6] RUN bundle install &&     rm -rf ~/.bundle/ "/usr/local/bundle"/ruby/*/cache  1.0s
+------
+ > [web build 3/6] RUN bundle install &&     rm -rf ~/.bundle/ "/usr/local/bundle"/ruby/*/cache "/usr/local/bundle"/ruby/*/bundler/gems/*/.git &&     bundle exec bootsnap precompile --gemfile:
+0.976 Your bundle only supports platforms [] but your local platform is x86_64-linux.
+0.976 Add the current platform to the lockfile with
+0.976 `bundle lock --add-platform x86_64-linux` and try again.
+------
+failed to solve: process "/bin/sh -c bundle install &&     rm -rf ~/.bundle/ \"${BUNDLE_PATH}\"/ruby/*/cache \"${BUNDLE_PATH}\"/ruby/*/bundler/gems/*/.git &&     bundle exec bootsnap precompile --gemfile" did not complete successfully: exit code: 16
+```
 
-Things you may want to cover:
+## `bundle lock --add-platform x86_64-linux`を実行
+これで`docker-compose build --no-cache`：成功！
 
-* Ruby version
+## database.yml編集
+```yml
+default: &default
+  adapter: mysql2
+  encoding: utf8
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  username: root
+  password: password # docker-compose.yml の MYSQL_ROOT_PASSWORD:に書いたパスワード
+  host: db # docker-compose.ymlで命名したMySQLのコンテナ名db
+```
 
-* System dependencies
+## `docker-compose up`失敗
+- `docker-compose up`：エラーで失敗
+- エラー内容：Missing `secret_key_base` for 'production' environment
+```sh
+myapp % docker-compose up
+[+] Running 2/0
+ ✔ Container myapp-db-1   Running                                                                       0.0s 
+ ✔ Container myapp-web-1  Created                                                                       0.0s 
+Attaching to db-1, web-1
+web-1  | => Booting Puma
+web-1  | => Rails 7.1.2 application starting in production 
+web-1  | => Run `bin/rails server --help` for more startup options
+web-1  | Exiting
+web-1  | /usr/local/bundle/ruby/3.1.0/gems/railties-7.1.2/lib/rails/application.rb:655:in `validate_secret_key_base': Missing `secret_key_base` for 'production' environment, set this string with `bin/rails credentials:edit` (ArgumentError)
+```
+### 原因
+`docker-compose run web rails new`で自動生成された`Dockerfile`で本番環境向けの記述になっていたため。
 
-* Configuration
+## `Dockerfile`をdevelopment用に変更
+- product用の記述になっていた部分を変更
+<img width="1023" alt="image" src="https://github.com/ChisatoMatoba/docker_test/assets/149556430/27568570-565f-4bd6-98a3-be73d8da8058">
+<img width="1005" alt="image" src="https://github.com/ChisatoMatoba/docker_test/assets/149556430/c0f82a78-1496-4caf-b10e-caad84a87df9">
 
-* Database creation
 
-* Database initialization
+<details><summary>git diff全文はこちら</summary>
+  
+```ruby
+myapp % git diff
+diff --git a/Dockerfile b/Dockerfile
+index 09fdb8c..7e2d346 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -7,11 +7,11 @@ FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
+ # Rails app lives here
+ WORKDIR /rails
+ 
+-# Set production environment
+-ENV RAILS_ENV="production" \
+-    BUNDLE_DEPLOYMENT="1" \
++# Set development environment and keys
++ENV RAILS_ENV="development" \
++    BUNDLE_DEPLOYMENT="0" \
+diff --git a/Dockerfile b/Dockerfile
+index 09fdb8c..7e2d346 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -7,11 +7,11 @@ FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
+ # Rails app lives here
+ WORKDIR /rails
+ 
+-# Set production environment
+-ENV RAILS_ENV="production" \
+-    BUNDLE_DEPLOYMENT="1" \
++# Set development environment and keys
++ENV RAILS_ENV="development" \
++    BUNDLE_DEPLOYMENT="0" \
+     BUNDLE_PATH="/usr/local/bundle" \
+-    BUNDLE_WITHOUT="development"
++    BUNDLE_WITHOUT="production"
+ 
+ 
+ # Throw-away build stage to reduce size of final image
+@@ -23,9 +23,7 @@ RUN apt-get update -qq && \
+ 
+ # Install application gems
+ COPY Gemfile Gemfile.lock ./
+-RUN bundle install && \
+-    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
+-    bundle exec bootsnap precompile --gemfile
++RUN bundle install
+ 
+ # Copy application code
+ COPY . .
+@@ -33,8 +31,8 @@ COPY . .
+ # Precompile bootsnap code for faster boot times
+ RUN bundle exec bootsnap precompile app/ lib/
+ 
+-# Precompiling assets for production without requiring secret RAILS_MASTER_KEY
+-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
++# Precompile assets for development
++RUN ./bin/rails assets:precompile RAILS_ENV=development
+ 
+ 
+ # Final stage for app image
+@@ -57,6 +55,8 @@ USER rails:rails
+ # Entrypoint prepares the database.
+ ENTRYPOINT ["/rails/bin/docker-entrypoint"]
+ 
+-# Start the server by default, this can be overwritten at runtime
++# Expose port 3000 for development server
+ EXPOSE 3000
+-CMD ["./bin/rails", "server"]
++
++# Start the development server
++CMD ["./bin/rails", "server", "-b", "0.0.0.0"]
+```
 
-* How to run the test suite
+</details>
 
-* Services (job queues, cache servers, search engines, etc.)
+- `docker-compose build --no-cache `：別のエラーで失敗
+- エラー内容：`You have already activated error_highlight 0.3.0, but your Gemfile requires error_highlight 0.5.1.`
+```sh
+myapp % docker-compose build --no-cache  
+[+] Building 189.7s (16/19)
 
-* Deployment instructions
+=> ERROR [web build 6/6] RUN ./bin/rails assets:precompile RAILS_ENV=development                       0.7s
+------
+ > [web build 6/6] RUN ./bin/rails assets:precompile RAILS_ENV=development:
+0.705 /usr/local/lib/ruby/3.1.0/bundler/runtime.rb:308:in `check_for_activated_spec!': You have already activated error_highlight 0.3.0, but your Gemfile requires error_highlight 0.5.1. Since error_highlight is a default gem, you can either remove your dependency on it or try updating to a newer version of bundler that supports error_highlight as a default gem. (Gem::LoadError)
+```
 
-* ...
+- `Gemfile`では0.4.0になっていたのに…
+```
+  gem "error_highlight", ">= 0.4.0", platforms: [:ruby]
+```
+- "error_highlight"の設定を（bundle clearのあとに）0.3.0にしてみたり0.5.1にしてみたりしたが、このエラーが消えなかった
+
+## gem "error_highlight"コメント化
+- `Gemfile`の`gem "error_highlight"`行をコメント化
+- `docker-compose build --no-cache `：成功！
+
+## `docker-compose up -d`成功
+- `docker-compose up -d`:成功
+```sh
+myapp % docker-compose ps   
+NAME          IMAGE       COMMAND                   SERVICE   CREATED             STATUS          PORTS
+myapp-db-1    mysql:8.1   "docker-entrypoint.s…"   db        About an hour ago   Up 52 seconds   0.0.0.0:3306->3306/tcp, 33060/tcp
+myapp-web-1   myapp-web   "/rails/bin/docker-e…"   web       52 seconds ago      Up 52 seconds   0.0.0.0:3000->3000/tcp
+```
+
+## コンテナ内でのrailsコマンド実行について
+- 参考サイトの通りではエラーになった
+```sh
+myapp % docker-compose exec web rails db:create
+OCI runtime exec failed: exec failed: unable to start container process: exec: "rails": executable file not found in $PATH: unknown
+```
+- 解決策：`rails`の前に`bundle exec`を追加→成功！
+```sh
+myapp % docker-compose exec web bundle exec rails db:create
+Created database 'myapp_development'
+Created database 'myapp_test'
+```
+
+- `http://127.0.0.1:3000/`にアクセス
+
+<img width="635" alt="image" src="https://github.com/ChisatoMatoba/docker_test/assets/149556430/54d3f4df-ff27-45be-ac56-ac838c3d2fa5">
