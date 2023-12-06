@@ -3,6 +3,13 @@
 
 ## `docker-compose run web rails new . --force --database=mysql --skip-bundle`実行
 - `docker-compose run web rails new . --force --database=mysql --skip-bundle`：成功！
+  
+  →`Dockerfile`が自動で追記・修正される
+
+  → [自動生成されたDockerfile](https://raw.githubusercontent.com/ChisatoMatoba/docker_test/272568c2e27ec19e30df7fa1757339c854d468aa/Dockerfile)
+  (これがあとでエラーのもとになります…)
+
+  
 - `docker-compose build --no-cache`：エラー
 ```sh
 myapp % docker-compose build --no-cache
@@ -53,81 +60,7 @@ web-1  | /usr/local/bundle/ruby/3.1.0/gems/railties-7.1.2/lib/rails/application.
 <img width="1023" alt="image" src="https://github.com/ChisatoMatoba/docker_test/assets/149556430/27568570-565f-4bd6-98a3-be73d8da8058">
 <img width="1005" alt="image" src="https://github.com/ChisatoMatoba/docker_test/assets/149556430/c0f82a78-1496-4caf-b10e-caad84a87df9">
 
-
-<details><summary>git diff全文はこちら</summary>
-  
-```ruby
-myapp % git diff
-diff --git a/Dockerfile b/Dockerfile
-index 09fdb8c..7e2d346 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -7,11 +7,11 @@ FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
- # Rails app lives here
- WORKDIR /rails
- 
--# Set production environment
--ENV RAILS_ENV="production" \
--    BUNDLE_DEPLOYMENT="1" \
-+# Set development environment and keys
-+ENV RAILS_ENV="development" \
-+    BUNDLE_DEPLOYMENT="0" \
-diff --git a/Dockerfile b/Dockerfile
-index 09fdb8c..7e2d346 100644
---- a/Dockerfile
-+++ b/Dockerfile
-@@ -7,11 +7,11 @@ FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
- # Rails app lives here
- WORKDIR /rails
- 
--# Set production environment
--ENV RAILS_ENV="production" \
--    BUNDLE_DEPLOYMENT="1" \
-+# Set development environment and keys
-+ENV RAILS_ENV="development" \
-+    BUNDLE_DEPLOYMENT="0" \
-     BUNDLE_PATH="/usr/local/bundle" \
--    BUNDLE_WITHOUT="development"
-+    BUNDLE_WITHOUT="production"
- 
- 
- # Throw-away build stage to reduce size of final image
-@@ -23,9 +23,7 @@ RUN apt-get update -qq && \
- 
- # Install application gems
- COPY Gemfile Gemfile.lock ./
--RUN bundle install && \
--    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
--    bundle exec bootsnap precompile --gemfile
-+RUN bundle install
- 
- # Copy application code
- COPY . .
-@@ -33,8 +31,8 @@ COPY . .
- # Precompile bootsnap code for faster boot times
- RUN bundle exec bootsnap precompile app/ lib/
- 
--# Precompiling assets for production without requiring secret RAILS_MASTER_KEY
--RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
-+# Precompile assets for development
-+RUN ./bin/rails assets:precompile RAILS_ENV=development
- 
- 
- # Final stage for app image
-@@ -57,6 +55,8 @@ USER rails:rails
- # Entrypoint prepares the database.
- ENTRYPOINT ["/rails/bin/docker-entrypoint"]
- 
--# Start the server by default, this can be overwritten at runtime
-+# Expose port 3000 for development server
- EXPOSE 3000
--CMD ["./bin/rails", "server"]
-+
-+# Start the development server
-+CMD ["./bin/rails", "server", "-b", "0.0.0.0"]
-```
-
-</details>
+[コミット変更内容ページ](https://github.com/ChisatoMatoba/docker_test/commit/99866685c9b3753291a1ec1fe27952c125bc88c3)
 
 - `docker-compose build --no-cache `：別のエラーで失敗
 - エラー内容：`You have already activated error_highlight 0.3.0, but your Gemfile requires error_highlight 0.5.1.`
