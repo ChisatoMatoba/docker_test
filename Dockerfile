@@ -22,7 +22,3 @@ RUN bundle install
 
 # Copy application code
 COPY . .
-
-# Install packages needed for deployment
-RUN apt-get update -qq && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
