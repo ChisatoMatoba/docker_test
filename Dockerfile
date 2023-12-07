@@ -27,10 +27,6 @@ COPY . .
 RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Run and own only the runtime files as a non-root user for security
-RUN useradd rails --create-home --shell /bin/bash && \
-    chown -R rails:rails db log storage tmp
-
 # Expose port 3000 for development server
 EXPOSE 3000
 
