@@ -14,7 +14,7 @@ ENV RAILS_ENV="development" \
 # Install packages needed to build gems
 # default-libmysqlclient-dev（MySQL用開発ヘッダー）は必要でした
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential default-libmysqlclient-dev git pkg-config
+    apt-get install --no-install-recommends -y build-essential default-libmysqlclient-dev
 
 # Install application gems
 COPY Gemfile Gemfile.lock ./
