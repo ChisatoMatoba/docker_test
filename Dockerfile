@@ -2,7 +2,7 @@
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
 ARG RUBY_VERSION=3.1.4
-FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim as base
+FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim
 
 # Rails app lives here
 WORKDIR /rails
@@ -12,10 +12,6 @@ ENV RAILS_ENV="development" \
     BUNDLE_DEPLOYMENT="0" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="production"
-
-
-# Throw-away build stage to reduce size of final image
-FROM base as build
 
 # Install packages needed to build gems
 RUN apt-get update -qq && \
@@ -33,10 +29,6 @@ RUN bundle exec bootsnap precompile app/ lib/
 
 # Precompile assets for development
 RUN ./bin/rails assets:precompile RAILS_ENV=development
-
-
-# Final stage for app image
-FROM base
 
 # Install packages needed for deployment
 RUN apt-get update -qq && \
