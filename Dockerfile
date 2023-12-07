@@ -7,11 +7,9 @@ FROM registry.docker.com/library/ruby:$RUBY_VERSION-slim
 # Rails app lives here
 WORKDIR /rails
 
-# Set development environment and keys
+# Set development environment
 ENV RAILS_ENV="development" \
-    BUNDLE_DEPLOYMENT="0" \
-    BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="production"
+    BUNDLE_PATH="/usr/local/bundle"
 
 # Install packages needed to build gems
 # default-libmysqlclient-dev（MySQL用開発ヘッダー）は必要でした
