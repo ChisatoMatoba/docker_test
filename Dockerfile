@@ -26,9 +26,3 @@ COPY . .
 # Install packages needed for deployment
 RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
-
-# Expose port 3000 for development server
-EXPOSE 3000
-
-# Start the development server
-CMD ["./bin/rails", "server", "-b", "0.0.0.0"]
